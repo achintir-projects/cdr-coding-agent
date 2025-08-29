@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Editor from '@monaco-editor/react'; // TODO: remove if unused
 import axios from 'axios';
 import CodeEditor from './CodeEditor';
 
@@ -14,6 +13,7 @@ const FileManager: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [activeFileId, setActiveFileId] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<string>('');
 
   // Load files from the backend on component mount
@@ -28,6 +28,9 @@ const FileManager: React.FC = () => {
         }
       } catch (error) {
         console.error('Error fetching files:', error);
+        setError('Failed to load files.');
+        setFiles([]);
+        setActiveFileId('');
       } finally {
         setIsLoading(false);
       }
@@ -101,10 +104,10 @@ const FileManager: React.FC = () => {
         context: activeFile.content
       });
       
-      const generatedCode = response.data.code;
-      const newContent = activeFile.content + '\n\n' + generatedCode;
+      const generatedCode = response.data?.code ?? '';
+      const newContent = activeFile.content + (generatedCode ? ('\n\n' + generatedCode) : '');
       
-      await axios.post('/.netlify/functions/api/files', {
+      await axios.post('/.netlify/functions/api-files', {
         id: activeFile.id,
         name: activeFile.name,
         content: newContent,
@@ -118,59 +121,87 @@ const FileManager: React.FC = () => {
       setPrompt('');
     } catch (error) {
       console.error('Error generating code:', error);
+      setError('Failed to generate code.');
     }
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
   return (
-    <div style={{ display: 'flex', height: '100vh', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', flex: 1 }}>
-        <div style={{ width: '250px', borderRight: '1px solid #333', padding: '10px' }}>
-          <div style={{ marginBottom: '10px' }}>
-            <button onClick={createNewFile}>New File</button>
-          </div>
-          <div>
-            {files.map(file => (
-              <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div 
-                  onClick={() => setActiveFileId(file.id)}
-                  style={{ 
-                    padding: '5px', 
-                    cursor: 'pointer',
-                    backgroundColor: activeFileId === file.id ? '#333' : 'transparent',
-                    flex: 1
-                  }}
-                >
-                  {file.name}
-                </div>
-                <button onClick={() => deleteFile(file.id)} style={{ padding: '2px 5px' }}>×</button>
+      <div style={{ height: '100vh', display: 'grid', placeItems: 'center', color: '#888' }}>
+         Loading files...
+      </div>
+  );
+  }
+  
+  return (
+  <div style={{ display: 'flex', height: '100vh', flexDirection: 'column' }}>
+  {/* Header */}
+  <div style={{ padding: '10px 12px', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: 8 }}>
+  <strong style={{ fontSize: 16 }}>Intelligent App Builder</strong>
+  <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+  <button onClick={createNewFile}>New File</button>
+  </div>
+  </div>
+  {/* Error banner */}
+  {error && (
+  <div style={{ background: '#3b1f1f', color: '#fca5a5', padding: '8px 12px' }}>
+  {error}
+  </div>
+  )}
+  <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+  {/* Sidebar */}
+  <div style={{ width: '260px', borderRight: '1px solid #333', padding: '10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+  <div style={{ fontSize: 12, color: '#aaa' }}>Files</div>
+  <div style={{ overflowY: 'auto', flex: 1 }}>
+    {files.length === 0 ? (
+        <div style={{ color: '#888', fontSize: 13 }}>
+          No files yet.
+        <div style={{ marginTop: 8 }}>
+        <button onClick={createNewFile}>Create first file</button>
+    </div>
+  </div>
+  ) : (
+  files.map(file => (
+  <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  <div 
+  onClick={() => setActiveFileId(file.id)}
+  style={{ 
+      padding: '6px 8px', 
+      cursor: 'pointer',
+        backgroundColor: activeFileId === file.id ? '#333' : 'transparent',
+        flex: 1,
+      borderRadius: 4
+  }}
+  >
+  {file.name}
+  </div>
+  <button onClick={() => deleteFile(file.id)} style={{ padding: '2px 6px', marginLeft: 6 }}>×</button>
+  </div>
+  ))
+  )}
+  </div>
+  </div>
+  {/* Main panel */}
+  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+  {activeFile ? (
+  <>
+  <div style={{ padding: '10px', borderBottom: '1px solid #333' }}>
+    <div style={{ display: 'flex', marginBottom: '10px' }}>
+    <input
+      type="text"
+      value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Enter a prompt to generate code..."
+            style={{ flex: 1, padding: '6px', marginRight: '10px' }}
+            />
+              <button onClick={generateCode}>Generate</button>
               </div>
-            ))}
-          </div>
-        </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {activeFile && (
-            <>
-              <div style={{ padding: '10px', borderBottom: '1px solid #333' }}>
-                <div style={{ display: 'flex', marginBottom: '10px' }}>
-                  <input
-                    type="text"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Enter a prompt to generate code..."
-                    style={{ flex: 1, padding: '5px', marginRight: '10px' }}
-                  />
-                  <button onClick={generateCode}>Generate</button>
-                </div>
                 <div>
                   <select 
                     value={activeFile.language}
                     onChange={(e) => {
                       const updatedFile = { ...activeFile, language: e.target.value };
-                      axios.post('/.netlify/functions/api/files', updatedFile);
+                      axios.post('/.netlify/functions/api-files', updatedFile);
                       setFiles(files.map(file => 
                         file.id === activeFileId ? updatedFile : file
                       ));
@@ -182,12 +213,18 @@ const FileManager: React.FC = () => {
                   </select>
                 </div>
               </div>
-              <CodeEditor
-                language={activeFile.language}
-                value={activeFile.content}
-                onChange={handleFileChange}
-              />
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <CodeEditor
+                  language={activeFile.language}
+                  value={activeFile.content}
+                  onChange={handleFileChange}
+                />
+              </div>
             </>
+          ) : (
+            <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: '#888' }}>
+              Select a file on the left or create a new one.
+            </div>
           )}
         </div>
       </div>
