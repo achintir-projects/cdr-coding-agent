@@ -20,10 +20,11 @@ const FileManager: React.FC = () => {
   useEffect(() => {
     const fetchFiles = async () => {
       try {
-        const response = await axios.get('/.netlify/functions/files');
-        setFiles(response.data.files);
-        if (response.data.files.length > 0) {
-          setActiveFileId(response.data.files[0].id);
+        const response = await axios.get('/.netlify/functions/api-files');
+        const list: File[] = Array.isArray(response.data?.files) ? response.data.files : [];
+        setFiles(list);
+        if (list.length > 0) {
+          setActiveFileId(list[0].id);
         }
       } catch (error) {
         console.error('Error fetching files:', error);
@@ -41,7 +42,7 @@ const FileManager: React.FC = () => {
     if (!activeFile) return;
     
     try {
-      await axios.post('/.netlify/functions/files', {
+      await axios.post('/.netlify/functions/api-files', {
         id: activeFile.id,
         name: activeFile.name,
         content,
@@ -65,7 +66,7 @@ const FileManager: React.FC = () => {
     };
     
     try {
-      await axios.post('/.netlify/functions/files', newFile);
+      await axios.post('/.netlify/functions/api-files', newFile);
       setFiles([...files, newFile]);
       setActiveFileId(newFile.id);
     } catch (error) {
@@ -75,7 +76,7 @@ const FileManager: React.FC = () => {
 
   const deleteFile = async (id: string) => {
     try {
-      await axios.delete('/.netlify/functions/files', {
+      await axios.delete('/.netlify/functions/api-files', {
         data: { id }
       });
       
@@ -94,7 +95,7 @@ const FileManager: React.FC = () => {
     if (!activeFile || !prompt) return;
     
     try {
-      const response = await axios.post('/.netlify/functions/generate', {
+      const response = await axios.post('/.netlify/functions/api-generate', {
         prompt,
         language: activeFile.language,
         context: activeFile.content
