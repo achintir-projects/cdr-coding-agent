@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
+import CodeEditor from './CodeEditor';
 
 interface File {
   id: string;
