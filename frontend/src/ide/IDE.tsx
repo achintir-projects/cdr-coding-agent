@@ -200,12 +200,13 @@ const IDE: React.FC = () => {
   const formatActive = async () => {
     if (!activeFile) return;
     try {
-      const prettier = await import('prettier/standalone');
-      const pluginBabel = await import('prettier/plugins/babel');
-      const pluginEstree = await import('prettier/plugins/estree');
-      const pluginTs = await import('prettier/plugins/typescript');
-      const parser = activeFile.language === 'typescript' ? 'typescript' : activeFile.language === 'javascript' ? 'babel' : 'babel';
-      const formatted = await prettier.format(activeFile.content, {
+      const prettier = (await import('prettier/standalone')) as any;
+      const format = (prettier?.format || prettier?.default?.format) as (code: string, opts: any) => Promise<string> | string;
+      const pluginBabel = ((await import('prettier/plugins/babel')) as any).default;
+      const pluginEstree = ((await import('prettier/plugins/estree')) as any).default;
+      const pluginTs = ((await import('prettier/plugins/typescript')) as any).default;
+      const parser = activeFile.language === 'typescript' ? 'typescript' : 'babel';
+      const formatted = await format(activeFile.content, {
         parser,
         plugins: [pluginBabel, pluginEstree, pluginTs],
         semi: true,
