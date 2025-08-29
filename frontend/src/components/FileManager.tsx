@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Editor from '@monaco-editor/react';
+import Editor from '@monaco-editor/react'; // TODO: remove if unused
 import axios from 'axios';
 import CodeEditor from './CodeEditor';
 
@@ -20,7 +20,7 @@ const FileManager: React.FC = () => {
   useEffect(() => {
     const fetchFiles = async () => {
       try {
-        const response = await axios.get('/.netlify/functions/api/files');
+        const response = await axios.get('/.netlify/functions/files');
         setFiles(response.data.files);
         if (response.data.files.length > 0) {
           setActiveFileId(response.data.files[0].id);
@@ -41,7 +41,7 @@ const FileManager: React.FC = () => {
     if (!activeFile) return;
     
     try {
-      await axios.post('/.netlify/functions/api/files', {
+      await axios.post('/.netlify/functions/files', {
         id: activeFile.id,
         name: activeFile.name,
         content,
@@ -65,7 +65,7 @@ const FileManager: React.FC = () => {
     };
     
     try {
-      await axios.post('/.netlify/functions/api/files', newFile);
+      await axios.post('/.netlify/functions/files', newFile);
       setFiles([...files, newFile]);
       setActiveFileId(newFile.id);
     } catch (error) {
@@ -75,7 +75,7 @@ const FileManager: React.FC = () => {
 
   const deleteFile = async (id: string) => {
     try {
-      await axios.delete('/.netlify/functions/api/files', {
+      await axios.delete('/.netlify/functions/files', {
         data: { id }
       });
       
@@ -94,7 +94,7 @@ const FileManager: React.FC = () => {
     if (!activeFile || !prompt) return;
     
     try {
-      const response = await axios.post('/.netlify/functions/api/generate', {
+      const response = await axios.post('/.netlify/functions/generate', {
         prompt,
         language: activeFile.language,
         context: activeFile.content
