@@ -1,0 +1,16 @@
+{
+  "name": "intelligent-app-builder-backend",
+  "version": "1.0.0",
+  "description": "Backend for Intelligent App Builder",
+  "main": "functions/api/generate.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "axios": "^0.27.2"
+  },
+  "devDependencies": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "axios": "^1.11.0",
+    "react-router-dom": "^6.30.1"
+  },
+  "devDependencies": {
+    "@types/react-router-dom": "^5.3.3"
+  }
+}
