@@ -1,68 +1,72 @@
-// Simple in-memory file storage for demo purposes
-// In production, you would use a database
-let files = [
-  { id: '1', name: 'index.js', content: '// Your code here', language: 'javascript' }
-];
+const { getStore } = require('@netlify/blobs');
 
-exports.handler = async (event, context) => {
+// Persistent file store using Netlify Blobs (KV)
+// Structure:
+// - Key 'index': array of { id, name, language }
+// - Key `file:${id}`: content string
+
+async function readIndex(store) {
+  const raw = await store.get('index', { type: 'json' });
+  return Array.isArray(raw) ? raw : [];
+}
+
+async function writeIndex(store, list) {
+  await store.set('index', JSON.stringify(list));
+}
+
+exports.handler = async (event) => {
   try {
     const method = event.httpMethod;
-    
+    const store = getStore({ name: 'files' });
+
     if (method === 'GET') {
-      // Return all files
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ files })
-      };
-    } else if (method === 'POST') {
-      // Create or update a file
-      const { id, name, content, language } = JSON.parse(event.body);
-      
-      if (id) {
-        // Update existing file
-        const index = files.findIndex(f => f.id === id);
-        if (index !== -1) {
-          files[index] = { id, name, content, language };
-        } else {
-          return {
-            statusCode: 404,
-            body: JSON.stringify({ error: 'File not found' })
-          };
-        }
-      } else {
-        // Create new file
-        const newFile = {
-          id: Date.now().toString(),
-          name,
-          content,
-          language
-        };
-        files.push(newFile);
-      }
-      
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ success: true })
-      };
-    } else if (method === 'DELETE') {
-      // Delete a file
-      const { id } = JSON.parse(event.body);
-      files = files.filter(f => f.id !== id);
-      
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ success: true })
-      };
+      const index = await readIndex(store);
+      // Inflate with content for convenience
+      const files = await Promise.all(
+        index.map(async (meta) => ({
+          ...meta,
+          content: (await store.get(`file:${meta.id}`)) || '',
+        }))
+      );
+      return { statusCode: 200, body: JSON.stringify({ files }) };
     }
-    
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
+
+    if (method === 'POST') {
+      const { id, name, content, language } = JSON.parse(event.body);
+      if (!name || !language) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'name and language are required' }) };
+      }
+
+      const index = await readIndex(store);
+      let fileId = id || Date.now().toString();
+      const existing = index.find((f) => f.id === fileId);
+
+      if (existing) {
+        existing.name = name;
+        existing.language = language;
+      } else {
+        index.push({ id: fileId, name, language });
+      }
+
+      await store.set(`file:${fileId}`, content ?? '');
+      await writeIndex(store, index);
+
+      return { statusCode: 200, body: JSON.stringify({ success: true, id: fileId }) };
+    }
+
+    if (method === 'DELETE') {
+      const { id } = JSON.parse(event.body || '{}');
+      if (!id) return { statusCode: 400, body: JSON.stringify({ error: 'id required' }) };
+
+      const index = await readIndex(store);
+      const next = index.filter((f) => f.id !== id);
+      await store.delete(`file:${id}`);
+      await writeIndex(store, next);
+      return { statusCode: 200, body: JSON.stringify({ success: true }) };
+    }
+
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   } catch (error) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message })
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };

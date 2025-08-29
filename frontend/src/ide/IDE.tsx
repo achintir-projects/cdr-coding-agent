@@ -197,11 +197,27 @@ const IDE: React.FC = () => {
     setPreviewOpen(true);
   };
 
-  const formatActive = () => {
+  const formatActive = async () => {
     if (!activeFile) return;
-    const formatted = activeFile.content.replace(/\t/g, '  ').trimEnd();
-    updateContent(formatted);
-    appendTerminal('Formatted current file');
+    try {
+      const prettier = await import('prettier/standalone');
+      const pluginBabel = await import('prettier/plugins/babel');
+      const pluginEstree = await import('prettier/plugins/estree');
+      const pluginTs = await import('prettier/plugins/typescript');
+      const parser = activeFile.language === 'typescript' ? 'typescript' : activeFile.language === 'javascript' ? 'babel' : 'babel';
+      const formatted = await prettier.format(activeFile.content, {
+        parser,
+        plugins: [pluginBabel, pluginEstree, pluginTs],
+        semi: true,
+        singleQuote: true,
+      });
+      updateContent(formatted);
+      appendTerminal('Formatted current file');
+    } catch (e) {
+      appendTerminal('prettier failed; applied fallback');
+      const fallback = activeFile.content.replace(/\t/g, '  ').trimEnd();
+      updateContent(fallback);
+    }
   };
 
   const onRunCommand = async (cmd: string) => {
