@@ -16,27 +16,31 @@ const FileManager: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<string>('');
 
+  const loadFiles = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get('/.netlify/functions/api-files');
+      const list: File[] = Array.isArray(response.data?.files) ? response.data.files : [];
+      setFiles(list);
+      if (list.length > 0) {
+        setActiveFileId(list[0].id);
+      } else {
+        setActiveFileId('');
+      }
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching files:', error);
+      setError('Failed to load files.');
+      setFiles([]);
+      setActiveFileId('');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Load files from the backend on component mount
   useEffect(() => {
-    const fetchFiles = async () => {
-      try {
-        const response = await axios.get('/.netlify/functions/api-files');
-        const list: File[] = Array.isArray(response.data?.files) ? response.data.files : [];
-        setFiles(list);
-        if (list.length > 0) {
-          setActiveFileId(list[0].id);
-        }
-      } catch (error) {
-        console.error('Error fetching files:', error);
-        setError('Failed to load files.');
-        setFiles([]);
-        setActiveFileId('');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchFiles();
+    loadFiles();
   }, []);
 
   const activeFile = files.find(file => file.id === activeFileId);
@@ -139,7 +143,8 @@ const FileManager: React.FC = () => {
   <div style={{ padding: '10px 12px', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: 8 }}>
   <strong style={{ fontSize: 16 }}>Intelligent App Builder</strong>
   <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-  <button onClick={createNewFile}>New File</button>
+    <button onClick={loadFiles}>Refresh</button>
+    <button onClick={createNewFile}>New File</button>
   </div>
   </div>
   {/* Error banner */}

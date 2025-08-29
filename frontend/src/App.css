@@ -1,3 +1,5 @@
-html, body, #root { height: 100%; margin: 0; }
+html, body, #root { height: 100%; margin: 0; background: #0f0f0f; color: #eee; }
 .App { height: 100%; }
-button { cursor: pointer; }
+button { cursor: pointer; background: #2a2a2a; color: #eee; border: 1px solid #333; border-radius: 6px; padding: 6px 10px; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+input, textarea, select { background: #1b1b1b; color: #eee; border: 1px solid #333; border-radius: 6px; }
