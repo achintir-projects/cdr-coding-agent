@@ -83,28 +83,29 @@ const Terminal: React.FC<{ lines: string[] }>= ({ lines }) => (
 
 const CommandPalette: React.FC<{ visible: boolean; onClose: () => void; onRun: (cmd: string) => void; }>
 = ({ visible, onClose, onRun }) => {
-  const [query, setQuery] = useState('');
-  const commands = useMemo(() => ([
-    { id: 'create', title: 'Create file' },
-    { id: 'rename', title: 'Rename file' },
-    { id: 'run', title: 'Run (Preview)' },
-    { id: 'format', title: 'Format active file' },
-    { id: 'reload', title: 'Reload file list' },
+const [query, setQuery] = useState('');
+const commands = useMemo(() => ([
+{ id: 'create', title: 'Create file' },
+{ id: 'rename', title: 'Rename file' },
+{ id: 'generate', title: 'Generate code (AI) into current file' },
+{ id: 'run', title: 'Run (Preview)' },
+{ id: 'format', title: 'Format active file' },
+  { id: 'reload', title: 'Reload file list' },
   ].filter(c => c.title.toLowerCase().includes(query.toLowerCase()))), [query]);
 
-  if (!visible) return null;
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'grid', placeItems: 'start center', paddingTop: '10vh', zIndex: 50 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: 640, maxWidth: '90vw', background: '#151515', border: '1px solid #333', borderRadius: 10, overflow: 'hidden' }}>
-        <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Type a command..." style={{ width: '100%', padding: 12, border: 'none', outline: 'none', background: '#1b1b1b', color: '#eee' }} />
-        <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-          {commands.map(c => (
-            <div key={c.id} onClick={() => onRun(c.id)} style={{ padding: 12, borderTop: '1px solid #222', cursor: 'pointer' }}>{c.title}</div>
-          ))}
-          {commands.length === 0 && <div style={{ padding: 12, color: '#888' }}>No commands</div>}
-        </div>
-      </div>
-    </div>
+if (!visible) return null;
+return (
+<div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'grid', placeItems: 'start center', paddingTop: '10vh', zIndex: 50 }}>
+<div onClick={e => e.stopPropagation()} style={{ width: 640, maxWidth: '90vw', background: '#151515', border: '1px solid #333', borderRadius: 10, overflow: 'hidden' }}>
+<input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Type a command..." style={{ width: '100%', padding: 12, border: 'none', outline: 'none', background: '#1b1b1b', color: '#eee' }} />
+<div style={{ maxHeight: 300, overflowY: 'auto' }}>
+{commands.map(c => (
+  <div key={c.id} onClick={() => onRun(c.id)} style={{ padding: 12, borderTop: '1px solid #222', cursor: 'pointer' }}>{c.title}</div>
+))}
+  {commands.length === 0 && <div style={{ padding: 12, color: '#888' }}>No commands</div>}
+  </div>
+  </div>
+  </div>
   );
 };
 
@@ -124,15 +125,44 @@ const IDE: React.FC = () => {
 
   const activeFile = useMemo(() => files.find(f => f.id === activeId), [files, activeId]);
 
+  const inferLanguage = (name: string): string => {
+    const ext = name.split('.').pop()?.toLowerCase();
+    if (ext === 'js' || ext === 'mjs' || ext === 'cjs') return 'javascript';
+    if (ext === 'ts') return 'typescript';
+    if (ext === 'py') return 'python';
+    if (ext === 'java') return 'java';
+    if (ext === 'html') return 'html';
+    if (ext === 'css') return 'css';
+    return 'javascript';
+  };
+
   const loadFiles = async () => {
     setLoading(true);
     try {
       const res = await axios.get('/.netlify/functions/api-files');
-      const list: IdeFile[] = Array.isArray(res.data?.files) ? res.data.files : [];
+      let list: IdeFile[] = Array.isArray(res.data?.files) ? res.data.files : [];
+
+      // Bootstrap workspace if empty
+      if (!list.length) {
+        const starter = [
+          { name: 'index.html', language: 'html', content: '<!doctype html>\n<html><head><meta charset="utf-8" /><title>App</title></head><body><div id="app"></div><script src="./app.js"></script></body></html>' },
+          { name: 'app.js', language: 'javascript', content: "console.log('Hello from the IDE starter!');" },
+          { name: 'styles.css', language: 'css', content: 'body { font-family: system-ui, sans-serif; }' },
+        ];
+        for (const f of starter) {
+          const payload = { id: Date.now().toString() + Math.random().toString(16).slice(2), ...f };
+          await axios.post('/.netlify/functions/api-files', payload);
+        }
+        const res2 = await axios.get('/.netlify/functions/api-files');
+        list = Array.isArray(res2.data?.files) ? res2.data.files : [];
+      }
+
       setFiles(list);
-      if (list.length && !activeId) {
-        setActiveId(list[0].id);
-        setOpenTabs([{ id: list[0].id }]);
+      if (list.length) {
+        // Prefer a JS/TS file if present
+        const preferred = list.find(f => /(\.|^)app\.(js|ts)$/i.test(f.name)) || list[0];
+        setActiveId(preferred.id);
+        setOpenTabs([{ id: preferred.id }]);
       }
       setError(null);
     } catch (e: any) {
@@ -143,6 +173,7 @@ const IDE: React.FC = () => {
       setLoading(false);
     }
   };
+
 
   useEffect(() => { loadFiles(); }, []);
 
@@ -226,8 +257,7 @@ const IDE: React.FC = () => {
       case 'create': {
         const name = prompt('Enter file name (e.g., app.js):');
         if (!name) return;
-        const ext = name.split('.').pop()?.toLowerCase();
-        const lang = ext === 'js' ? 'javascript' : ext === 'py' ? 'python' : ext === 'java' ? 'java' : 'javascript';
+        const lang = inferLanguage(name);
         await createFile(name, lang, '// New file');
         setPaletteOpen(false);
         break;
@@ -240,10 +270,30 @@ const IDE: React.FC = () => {
         setPaletteOpen(false);
         break;
       }
+      case 'generate': {
+        const promptText = prompt('Describe the code to generate:');
+        if (!promptText || !activeFile) { setPaletteOpen(false); break; }
+        try {
+          appendTerminal('Generating code...');
+          const resp = await axios.post('/.netlify/functions/api-generate', {
+            prompt: promptText,
+            language: activeFile.language,
+            context: activeFile.content,
+          });
+          const code = resp.data?.code || '';
+          const merged = activeFile.content + (code ? ('\n\n' + code) : '');
+          await updateContent(merged);
+          appendTerminal('Code generated and appended');
+        } catch (e: any) {
+          appendTerminal('Generation failed');
+        }
+        setPaletteOpen(false);
+        break;
+      }
       case 'run':
         runPreview(); setPaletteOpen(false); break;
       case 'format':
-        formatActive(); setPaletteOpen(false); break;
+        await formatActive(); setPaletteOpen(false); break;
       case 'reload':
         await loadFiles(); setPaletteOpen(false); break;
       default:
