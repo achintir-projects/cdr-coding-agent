@@ -1,5 +1,6 @@
 [build]
-  command = "cd frontend && npm ci && npm run build"
+  # Use root workspace install so both functions and frontend deps are installed
+  command = "npm install && npm --workspace frontend run build"
   publish = "frontend/dist"
 
 [functions]
